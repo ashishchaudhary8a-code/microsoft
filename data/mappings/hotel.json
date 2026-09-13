@@ -1,0 +1,16 @@
+{
+  "domain": "hotel",
+  "organization_id": "ORG_HOTEL_001",
+  "column_map": {
+    "booking_id": "event_id",
+    "created_at": "timestamp",
+    "clerk_id": "user_id",
+    "property_city": "location",
+    "total": "amount"
+  },
+  "defaults": {
+    "event_type": "event",
+    "currency": "INR",
+    "domain": "hotel"
+  }
+}

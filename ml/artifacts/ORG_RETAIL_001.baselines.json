@@ -1,0 +1,80 @@
+{
+  "organization_id": "ORG_RETAIL_001",
+  "lookback_days": 30,
+  "org": {
+    "amount_avg": 44.25823333333333,
+    "amount_std": 11.64082272873752,
+    "usual_location": "Boston",
+    "devices": [
+      "REG_1",
+      "REG_2"
+    ],
+    "ips": [
+      "10.2.0.10",
+      "10.2.0.11"
+    ],
+    "usual_hours": [
+      8,
+      9,
+      10,
+      11,
+      13,
+      14,
+      15,
+      16,
+      17
+    ],
+    "event_count": 600,
+    "events_per_day": 19.933554817275745
+  },
+  "users": {
+    "USR_R01": {
+      "amount_avg": 43.791237785016285,
+      "amount_std": 11.286066389194808,
+      "usual_location": "Boston",
+      "devices": [
+        "REG_1"
+      ],
+      "ips": [
+        "10.2.0.10"
+      ],
+      "usual_hours": [
+        8,
+        9,
+        10,
+        11,
+        13,
+        14,
+        15,
+        16,
+        17
+      ],
+      "event_count": 307,
+      "events_per_day": 10.199335548172757
+    },
+    "USR_R02": {
+      "amount_avg": 44.74754266211605,
+      "amount_std": 12.001112995005625,
+      "usual_location": "Chicago",
+      "devices": [
+        "REG_2"
+      ],
+      "ips": [
+        "10.2.0.11"
+      ],
+      "usual_hours": [
+        8,
+        9,
+        10,
+        11,
+        13,
+        14,
+        15,
+        16,
+        17
+      ],
+      "event_count": 293,
+      "events_per_day": 9.997156667614444
+    }
+  }
+}

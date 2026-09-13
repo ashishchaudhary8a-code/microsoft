@@ -1,0 +1,13 @@
+{
+  "organization_id": "ORG_HOTEL_001",
+  "organization_name": "Hotel Aurora",
+  "domain": "hotel",
+  "timezone": "Asia/Kolkata",
+  "currency": "INR",
+  "baseline_lookback_days": 30,
+  "anomaly_score_threshold": 0.75,
+  "suspicious_score_threshold": 0.60,
+  "suspicious_event_window_seconds": 300,
+  "suspicious_event_count": 3,
+  "freshness_sla_seconds": 5
+}

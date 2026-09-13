@@ -1,0 +1,105 @@
+{
+  "organization_id": "ORG_HOSPITAL_001",
+  "lookback_days": 30,
+  "org": {
+    "amount_avg": 3532.4296833333333,
+    "amount_std": 930.3818841830989,
+    "usual_location": "Pune",
+    "devices": [
+      "DEVICE_12",
+      "DEVICE_4",
+      "DEVICE_9"
+    ],
+    "ips": [
+      "10.0.0.14",
+      "10.0.0.18",
+      "10.0.0.22"
+    ],
+    "usual_hours": [
+      8,
+      9,
+      10,
+      11,
+      13,
+      14,
+      15,
+      16,
+      17
+    ],
+    "event_count": 600,
+    "events_per_day": 19.933554817275745
+  },
+  "users": {
+    "USR_055": {
+      "amount_avg": 3504.0206220095693,
+      "amount_std": 900.3259104331094,
+      "usual_location": "Pune",
+      "devices": [
+        "DEVICE_9"
+      ],
+      "ips": [
+        "10.0.0.22"
+      ],
+      "usual_hours": [
+        8,
+        9,
+        10,
+        11,
+        13,
+        14,
+        15,
+        16,
+        17
+      ],
+      "event_count": 209,
+      "events_per_day": 6.9454444752146225
+    },
+    "USR_204": {
+      "amount_avg": 3590.792263157895,
+      "amount_std": 966.872048516105,
+      "usual_location": "Pune",
+      "devices": [
+        "DEVICE_12"
+      ],
+      "ips": [
+        "10.0.0.14"
+      ],
+      "usual_hours": [
+        9,
+        10,
+        11,
+        13,
+        14,
+        15,
+        16,
+        17
+      ],
+      "event_count": 190,
+      "events_per_day": 6.473594548551959
+    },
+    "USR_118": {
+      "amount_avg": 3506.800845771144,
+      "amount_std": 928.0778070182376,
+      "usual_location": "Mumbai",
+      "devices": [
+        "DEVICE_4"
+      ],
+      "ips": [
+        "10.0.0.18"
+      ],
+      "usual_hours": [
+        8,
+        9,
+        10,
+        11,
+        13,
+        14,
+        15,
+        16,
+        17
+      ],
+      "event_count": 201,
+      "events_per_day": 6.6962798445308165
+    }
+  }
+}
