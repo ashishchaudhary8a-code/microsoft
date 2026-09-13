@@ -1,0 +1,16 @@
+{
+  "domain": "retail",
+  "organization_id": "ORG_RETAIL_001",
+  "column_map": {
+    "order_id": "event_id",
+    "order_ts": "timestamp",
+    "associate_id": "user_id",
+    "store_city": "location",
+    "order_total": "amount"
+  },
+  "defaults": {
+    "event_type": "event",
+    "currency": "USD",
+    "domain": "retail"
+  }
+}

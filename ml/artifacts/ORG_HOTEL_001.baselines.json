@@ -1,0 +1,80 @@
+{
+  "organization_id": "ORG_HOTEL_001",
+  "lookback_days": 30,
+  "org": {
+    "amount_avg": 7907.2866,
+    "amount_std": 1455.0963800570732,
+    "usual_location": "Goa",
+    "devices": [
+      "POS_1",
+      "POS_2"
+    ],
+    "ips": [
+      "10.1.0.10",
+      "10.1.0.11"
+    ],
+    "usual_hours": [
+      8,
+      9,
+      10,
+      11,
+      13,
+      14,
+      15,
+      16,
+      17
+    ],
+    "event_count": 600,
+    "events_per_day": 19.933554817275745
+  },
+  "users": {
+    "USR_H01": {
+      "amount_avg": 7848.893973941369,
+      "amount_std": 1410.7451795376553,
+      "usual_location": "Goa",
+      "devices": [
+        "POS_1"
+      ],
+      "ips": [
+        "10.1.0.10"
+      ],
+      "usual_hours": [
+        8,
+        9,
+        10,
+        11,
+        13,
+        14,
+        15,
+        16,
+        17
+      ],
+      "event_count": 307,
+      "events_per_day": 10.199335548172757
+    },
+    "USR_H02": {
+      "amount_avg": 7968.469317406142,
+      "amount_std": 1500.1376737144753,
+      "usual_location": "Jaipur",
+      "devices": [
+        "POS_2"
+      ],
+      "ips": [
+        "10.1.0.11"
+      ],
+      "usual_hours": [
+        8,
+        9,
+        10,
+        11,
+        13,
+        14,
+        15,
+        16,
+        17
+      ],
+      "event_count": 293,
+      "events_per_day": 9.997156667614444
+    }
+  }
+}
