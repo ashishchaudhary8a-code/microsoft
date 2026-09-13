@@ -8,8 +8,15 @@ Redpanda consumer for `events.raw`. Validate → normalize → dedupe → featur
 docker compose up --build redpanda redpanda-init train streaming
 ```
 
-Health: `http://localhost:8002/health`  
+Health: `http://localhost:8002/health` (Compose `streaming` service is healthy only when this returns `"status":"ok"`)  
 Metrics: `http://localhost:8001/metrics`
+
+Full local stack (includes synthetic generator):
+
+```bash
+docker compose up --build
+```
+
 
 ## Tests
 

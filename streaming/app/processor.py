@@ -17,18 +17,21 @@ from streaming.app.config import CONSUMER_ID, DEDUPE_TTL_SECONDS, ML_ARTIFACT_DI
 from streaming.app.dedupe import EventDeduper
 from streaming.app.features import FeatureState, build_features
 from streaming.app.metrics import (
+    alerts_total,
     anomalies_total,
     critical_anomalies_total,
     events_deduped_total,
+    events_dropped_total,
     events_failed_total,
+    events_per_second,
     events_processed_total,
     events_received_total,
     ml_failures_total,
-    processing_latency_seconds,
+    record_processing_latency,
     service_health,
 )
 from streaming.app.normalize import normalize_event
-from streaming.app.producer import dlq_envelope, message_key
+from streaming.app.producer import dlq_envelope, message_key, send_with_retry
 from streaming.app.validate import ValidationError, validate_event
 
 log = logging.getLogger("streaming")
@@ -111,14 +114,16 @@ class StreamProcessor:
         self._eps: deque[float] = deque()
 
     def _send(self, topic: str, key_event: dict[str, Any], value: Any) -> None:
-        self.producer.send(topic, key=message_key(key_event), value=value)
+        send_with_retry(self.producer, topic, message_key(key_event), value)
 
     def _dlq(self, payload: Any, code: str, message: str) -> None:
         envelope = dlq_envelope(self.topics["raw"], code, message, payload)
-        org = {}
-        if isinstance(payload, dict):
-            org = payload
-        self._send(self.topics["dlq"], org, envelope)
+        org = payload if isinstance(payload, dict) else {}
+        try:
+            self._send(self.topics["dlq"], org, envelope)
+        except Exception:
+            events_dropped_total.inc()
+            log.exception("DLQ produce failed")
         events_failed_total.inc()
 
     def process_raw(self, raw: Any, received_at: Optional[datetime] = None) -> Optional[dict[str, Any]]:
@@ -167,8 +172,12 @@ class StreamProcessor:
             service_health.labels(component="ml").set(0)
             self._dlq(event, "ML_ERROR", str(exc))
             # still produce processed event with features; skip anomaly
-            self._send(self.topics["processed"], event, record)
-            events_processed_total.inc()
+            try:
+                self._send(self.topics["processed"], event, record)
+                events_processed_total.inc()
+            except Exception:
+                events_dropped_total.inc()
+                log.exception("processed produce failed after ML error")
             return record
 
         service_health.labels(component="ml").set(1)
@@ -179,32 +188,47 @@ class StreamProcessor:
             "reasons": result_dict.get("reasons") or [],
             "model_version": result_dict.get("model_version"),
         }
-        self._send(self.topics["processed"], event, record)
-        events_processed_total.inc()
+        try:
+            self._send(self.topics["processed"], event, record)
+            events_processed_total.inc()
+        except Exception:
+            events_dropped_total.inc()
+            log.exception("processed produce failed")
+            self._dlq(event, "PRODUCE_ERROR", "failed to produce events.processed")
+            return None
         latency = (processed_at - received).total_seconds()
-        processing_latency_seconds.observe(max(latency, 0.0))
+        record_processing_latency(latency)
 
         if result_dict["is_anomaly"]:
             anomalies_total.inc()
-            self._send(self.topics["anomalies"], event, result_dict)
+            try:
+                self._send(self.topics["anomalies"], event, result_dict)
+            except Exception:
+                log.exception("anomaly produce failed")
         if result_dict["severity"] == "CRITICAL":
             critical_anomalies_total.inc()
 
         if result_dict["anomaly_score"] >= 0.90:
             alert = make_extreme_alert(event, result_dict)
-            self._send(self.topics["alerts"], event, alert)
+            try:
+                self._send(self.topics["alerts"], event, alert)
+                alerts_total.labels(alert_type="SINGLE_EXTREME_EVENT").inc()
+            except Exception:
+                log.exception("extreme alert produce failed")
 
         burst_window = self.burst.observe(event, result_dict["anomaly_score"], org_config)
         if burst_window:
             alert = make_burst_alert(event, result_dict, burst_window, org_config)
-            self._send(self.topics["alerts"], event, alert)
+            try:
+                self._send(self.topics["alerts"], event, alert)
+                alerts_total.labels(alert_type="SUSPICIOUS_EVENT_BURST").inc()
+            except Exception:
+                log.exception("burst alert produce failed")
 
         now = time.time()
         self._eps.append(now)
         while self._eps and now - self._eps[0] > 1.0:
             self._eps.popleft()
-        from streaming.app.metrics import events_per_second
-
         events_per_second.set(len(self._eps))
         return record
 

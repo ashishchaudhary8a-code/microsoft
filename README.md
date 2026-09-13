@@ -11,7 +11,7 @@ cp .env.example .env
 docker compose up --build
 ```
 
-- Streaming health: http://localhost:8002/health
+- Streaming health: http://localhost:8002/health (`streaming` Compose healthcheck)
 - Streaming metrics: http://localhost:8001/metrics
 - Redpanda (host): `localhost:19092`
 

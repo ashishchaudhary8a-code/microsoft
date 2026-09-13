@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import threading
@@ -29,7 +30,13 @@ from streaming.app.producer import build_producer
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 log = logging.getLogger("streaming.main")
 
-HEALTH = {"status": "starting", "broker": "unknown"}
+HEALTH: dict[str, Any] = {
+    "status": "starting",
+    "streaming": "starting",
+    "broker": "unknown",
+    "ml": "unknown",
+    "consumer_lag": 0,
+}
 
 
 class HealthHandler(BaseHTTPRequestHandler):
@@ -38,14 +45,15 @@ class HealthHandler(BaseHTTPRequestHandler):
             self.send_response(404)
             self.end_headers()
             return
-        body = (
-            '{"status":"%s","streaming":"%s","broker":"%s"}'
-            % (
-                "ok" if HEALTH["status"] == "ok" else HEALTH["status"],
-                HEALTH["status"],
-                HEALTH["broker"],
-            )
-        ).encode()
+        payload = {
+            "status": HEALTH["status"],
+            "streaming": HEALTH.get("streaming") or HEALTH["status"],
+            "broker": HEALTH["broker"],
+            "ml": HEALTH.get("ml", "unknown"),
+            "consumer_lag": HEALTH.get("consumer_lag", 0),
+            "checked_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        }
+        body = json.dumps(payload).encode()
         code = 200 if HEALTH["status"] == "ok" else 503
         self.send_response(code)
         self.send_header("Content-Type", "application/json")
@@ -72,24 +80,31 @@ def wait_for_broker(bootstrap: str, timeout_s: int = 90) -> None:
     raise RuntimeError(f"broker not ready: {last}")
 
 
-def update_lag(consumer: KafkaConsumer) -> None:
+def update_lag(consumer: KafkaConsumer) -> int:
+    total = 0
     try:
         parts = consumer.assignment()
         if not parts:
-            return
+            return 0
         end = consumer.end_offsets(list(parts))
         for tp in parts:
             pos = consumer.position(tp)
             lag = max(int(end.get(tp, pos) - pos), 0)
+            total += lag
             consumer_lag.labels(topic=tp.topic, partition=str(tp.partition)).set(lag)
+        HEALTH["consumer_lag"] = total
     except Exception:
         log.debug("lag scrape failed", exc_info=True)
+    return total
 
 
 def run() -> None:
     start_metrics(METRICS_PORT)
     threading.Thread(
-        target=lambda: ThreadingHTTPServer(("0.0.0.0", int(os.environ.get("STREAMING_HEALTH_PORT", "8002"))), HealthHandler).serve_forever(),
+        target=lambda: ThreadingHTTPServer(
+            ("0.0.0.0", int(os.environ.get("STREAMING_HEALTH_PORT", "8002"))),
+            HealthHandler,
+        ).serve_forever(),
         daemon=True,
     ).start()
 
@@ -107,6 +122,7 @@ def run() -> None:
     processor = StreamProcessor(producer, topics)
 
     while True:
+        consumer = None
         try:
             consumer = KafkaConsumer(
                 TOPIC_RAW,
@@ -119,6 +135,8 @@ def run() -> None:
                 consumer_timeout_ms=1000,
             )
             HEALTH["status"] = "ok"
+            HEALTH["streaming"] = "ok"
+            HEALTH["ml"] = "ok"
             service_health.labels(component="streaming").set(1)
             log.info("consuming %s from %s", TOPIC_RAW, bootstrap)
             while True:
@@ -128,20 +146,31 @@ def run() -> None:
                     continue
                 for _tp, batch in records.items():
                     for msg in batch:
-                        processor.process_raw_json(msg.value)
+                        try:
+                            processor.process_raw_json(msg.value)
+                        except Exception:
+                            log.exception("process_raw_json crashed; continuing")
                 producer.flush()
                 update_lag(consumer)
         except NoBrokersAvailable:
             HEALTH["status"] = "degraded"
+            HEALTH["streaming"] = "degraded"
             HEALTH["broker"] = "down"
             service_health.labels(component="streaming").set(0)
             log.warning("broker unavailable; retrying")
             time.sleep(2)
         except KafkaError:
             HEALTH["status"] = "degraded"
+            HEALTH["streaming"] = "degraded"
             service_health.labels(component="streaming").set(0)
             log.exception("kafka error; restarting consumer")
             time.sleep(2)
+        finally:
+            if consumer is not None:
+                try:
+                    consumer.close()
+                except Exception:
+                    pass
 
 
 if __name__ == "__main__":

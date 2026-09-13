@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from collections import deque
+
 from prometheus_client import Counter, Gauge, Histogram, start_http_server
 
 events_received_total = Counter("events_received_total", "Events read from events.raw")
@@ -17,10 +21,27 @@ processing_latency_seconds = Histogram(
 )
 processing_latency_p95_seconds = Gauge(
     "processing_latency_p95_seconds",
-    "Approximate P95 processing latency from histogram",
+    "Approximate P95 processing latency from recent samples",
 )
 consumer_lag = Gauge("consumer_lag", "Approx consumer lag (end offset - position)", ["topic", "partition"])
 service_health = Gauge("service_health", "1 if streaming loop is healthy", ["component"])
+
+_recent_latencies: deque[float] = deque(maxlen=500)
+
+
+def record_processing_latency(seconds: float) -> None:
+    value = max(float(seconds), 0.0)
+    processing_latency_seconds.observe(value)
+    _recent_latencies.append(value)
+    processing_latency_p95_seconds.set(percentile(list(_recent_latencies), 0.95))
+
+
+def percentile(samples: list[float], q: float) -> float:
+    if not samples:
+        return 0.0
+    ordered = sorted(samples)
+    idx = min(len(ordered) - 1, max(0, int(round((len(ordered) - 1) * q))))
+    return float(ordered[idx])
 
 
 def start_metrics(port: int) -> None:

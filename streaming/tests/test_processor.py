@@ -48,7 +48,24 @@ def test_invalid_goes_to_dlq_not_processed():
     assert "events.processed" not in topics
 
 
-def test_extreme_amount_emits_anomaly_and_alert():
+def test_extreme_score_emits_anomaly_and_alert(monkeypatch):
+    import streaming.app.processor as processor_mod
+
+    class Stub:
+        def to_dict(self):
+            return {
+                "event_id": "EVT_1",
+                "organization_id": "ORG_HOSPITAL_001",
+                "anomaly_score": 0.96,
+                "risk_score": 0.96,
+                "severity": "CRITICAL",
+                "is_anomaly": True,
+                "reasons": [{"code": "AMOUNT_ZSCORE", "feature": "amount_zscore", "detail": "stub", "contribution": 0.4}],
+                "model_version": "test-stub",
+                "processed_at": "2026-09-11T02:31:00.400Z",
+            }
+
+    monkeypatch.setattr(processor_mod, "score_event", lambda *a, **k: Stub())
     prod = FakeProducer()
     proc = StreamProcessor(
         prod,
@@ -70,10 +87,10 @@ def test_extreme_amount_emits_anomaly_and_alert():
     anomalies = [v for t, _, v in prod.sent if t == "anomalies.detected"]
     alerts = [v for t, _, v in prod.sent if t == "alerts.generated"]
     assert anomalies
-    assert anomalies[0]["anomaly_score"] >= 0.0
-    assert 0 <= anomalies[0]["anomaly_score"] <= 1
-    if anomalies[0]["anomaly_score"] >= 0.90:
-        assert any(a["alert_type"] == "SINGLE_EXTREME_EVENT" for a in alerts)
+    assert anomalies[0]["anomaly_score"] == 0.96
+    assert any(a["alert_type"] == "SINGLE_EXTREME_EVENT" for a in alerts)
+    keys = [k for t, k, _ in prod.sent if t == "events.processed"]
+    assert keys == [b"ORG_HOSPITAL_001:USR_204"]
 
 
 def test_burst_emits_once():
@@ -112,3 +129,56 @@ def test_duplicate_dropped():
     proc.process_raw(_event(1, 1000))
     after = len(prod.sent)
     assert after == before
+
+
+def test_invalid_json_goes_to_dlq():
+    prod = FakeProducer()
+    proc = StreamProcessor(
+        prod,
+        {"raw": "events.raw", "processed": "events.processed", "anomalies": "anomalies.detected", "alerts": "alerts.generated", "dlq": "events.dlq"},
+        artifact_dir="ml/artifacts",
+        org_config_dir="data/orgs",
+    )
+    proc.process_raw_json(b"{not-json")
+    assert any(t == "events.dlq" for t, _, _ in prod.sent)
+    assert all(t != "events.processed" for t, _, _ in prod.sent)
+
+
+def test_ml_failure_still_produces_processed(monkeypatch):
+    import streaming.app.processor as processor_mod
+
+    def boom(*_a, **_k):
+        raise RuntimeError("model exploded")
+
+    monkeypatch.setattr(processor_mod, "score_event", boom)
+    prod = FakeProducer()
+    proc = StreamProcessor(
+        prod,
+        {"raw": "events.raw", "processed": "events.processed", "anomalies": "anomalies.detected", "alerts": "alerts.generated", "dlq": "events.dlq"},
+        artifact_dir="ml/artifacts",
+        org_config_dir="data/orgs",
+    )
+    record = proc.process_raw(_event(2, 1000))
+    assert record is not None
+    topics = [t for t, _, _ in prod.sent]
+    assert "events.processed" in topics
+    assert "events.dlq" in topics
+    assert "anomalies.detected" not in topics
+
+
+def test_unknown_org_is_not_hardcoded_domain():
+    prod = FakeProducer()
+    proc = StreamProcessor(
+        prod,
+        {"raw": "events.raw", "processed": "events.processed", "anomalies": "anomalies.detected", "alerts": "alerts.generated", "dlq": "events.dlq"},
+        artifact_dir="ml/artifacts",
+        org_config_dir="data/orgs",
+    )
+    ev = _event(3, 50)
+    ev["organization_id"] = "ORG_WAREHOUSE_009"
+    ev["domain"] = "warehouse"
+    record = proc.process_raw(ev)
+    assert record is not None
+    assert record["event"]["domain"] == "warehouse"
+    cfg = proc.orgs.get("ORG_WAREHOUSE_009")
+    assert cfg["domain"] == "warehouse"

@@ -36,8 +36,29 @@ services:
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
-        rpk topic create events.raw events.processed --brokers redpanda:9092 -p 3 -r 1 --config retention.ms=86400000 || true
-        rpk topic create anomalies.detected alerts.generated events.dlq --brokers redpanda:9092 -p 3 -r 1 --config retention.ms=259200000 || true
+        set -e
+        create_topics() {
+          rpk topic create events.raw events.processed --brokers redpanda:9092 -p 3 -r 1 --config retention.ms=86400000 || true
+          rpk topic create anomalies.detected alerts.generated events.dlq --brokers redpanda:9092 -p 3 -r 1 --config retention.ms=259200000 || true
+        }
+        i=0
+        while [ "$$i" -lt 15 ]; do
+          create_topics
+          ok=1
+          for t in events.raw events.processed anomalies.detected alerts.generated events.dlq; do
+            if ! rpk topic describe "$$t" --brokers redpanda:9092 >/dev/null 2>&1; then
+              ok=0
+            fi
+          done
+          if [ "$$ok" -eq 1 ]; then
+            rpk topic list --brokers redpanda:9092
+            exit 0
+          fi
+          i=$$((i+1))
+          sleep 2
+        done
+        echo "topic create failed"
+        exit 1
 
   train:
     build:
@@ -69,6 +90,18 @@ services:
     volumes:
       - ml_artifacts:/app/ml/artifacts
     restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import json,urllib.request; b=json.load(urllib.request.urlopen('http://127.0.0.1:8002/health', timeout=2)); raise SystemExit(0 if b.get('status')=='ok' else 1)",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 20s
 
   generator:
     build:
@@ -78,7 +111,7 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: redpanda:9092
     depends_on:
       streaming:
-        condition: service_started
+        condition: service_healthy
     command: python -m data.generators.generate --scenario normal --rate 4 --organization_id ORG_HOSPITAL_001
     restart: unless-stopped
 
