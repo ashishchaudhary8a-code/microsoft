@@ -1,0 +1,2 @@
+# Optional. `monitoring/locustfile.py` is the load-test stub.
+# Alternative (no Locust): raise the generator rate, e.g. --rate 50 --duration 300
