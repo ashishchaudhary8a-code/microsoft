@@ -1,0 +1,32 @@
+{
+  "id": null,
+  "uid": "errors",
+  "title": "Errors",
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "5s",
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Failed events",
+      "gridPos": { "h": 4, "w": 8, "x": 0, "y": 0 },
+      "targets": [{ "expr": "events_failed_total", "refId": "A" }]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "ML failures",
+      "gridPos": { "h": 4, "w": 8, "x": 8, "y": 0 },
+      "targets": [{ "expr": "ml_failures_total", "refId": "A" }]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Deduped",
+      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 0 },
+      "targets": [{ "expr": "events_deduped_total", "refId": "A" }]
+    }
+  ]
+}

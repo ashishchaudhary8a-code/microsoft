@@ -16,8 +16,6 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
 
-ROOT = Path(__file__).resolve().parents[2]
-
 
 def load_org(org_id: str) -> dict[str, Any]:
     path = ROOT / "data" / "orgs" / f"{org_id}.json"
@@ -199,7 +197,7 @@ def write_history(org_id: str, days: int, per_day: int, out: Path, seed: int = 4
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--organization_id", default="ORG_HOSPITAL_001")
-    parser.add_argument("--scenario", choices=("normal", "extreme", "burst", "history"), default="normal")
+    parser.add_argument("--scenario", choices=("normal", "extreme", "burst", "history", "invalid"), default="normal")
     parser.add_argument("--rate", type=float, default=5.0, help="events/sec for normal")
     parser.add_argument("--duration", type=int, default=0, help="seconds; 0 = forever")
     parser.add_argument("--stdout", action="store_true")
@@ -229,6 +227,16 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.scenario == "burst":
         emit(burst_events(org, rng, 4))
+        return 0
+    if args.scenario == "invalid":
+        emit(
+            [
+                {
+                    "organization_id": org["organization_id"],
+                    "note": "missing required event fields — should land on events.dlq",
+                }
+            ]
+        )
         return 0
 
     prod = None if args.stdout else BufferedProducer(args.bootstrap)
